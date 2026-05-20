@@ -224,13 +224,7 @@ export class ServicosService {
       orderBy: { criadoEm: 'desc' },
     });
 
-    // Filtro adicional de bairro (no app, pode atender bairros em outras cidades)
-    const filtrados = servicos.filter((s) => {
-      if (prestador.cidade === s.cidade) return true;
-      return bairros.includes(s.bairro);
-    });
-
-    return filtrados.map((s) => this._serializeServico(s));
+    return servicos.map((s) => this._serializeServico(s));
   }
 
   // ---------------- prestador: aceitar (concorrência) ----------------

@@ -1,23 +1,6 @@
 import { useState } from 'react';
 import { useToast } from '../context/ToastContext';
-
-const ESPECIALIDADES = [
-  'Eletricista',
-  'Encanador',
-  'Pintor',
-  'Pedreiro',
-  'Marceneiro / Carpinteiro',
-  'Jardineiro',
-  'Diarista / Faxineiro(a)',
-  'Cozinheiro(a)',
-  'Montador de Móveis',
-  'Técnico em Ar-condicionado',
-  'Dedetizador',
-  'Chaveiro',
-  'Vidraceiro',
-  'Gesseiro',
-  'Outro',
-];
+import { CATEGORIAS } from '../lib/constants';
 
 export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
   const [mode, setMode] = useState('login');
@@ -39,10 +22,9 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [cepLoading, setCepLoading] = useState(false);
 
-  // Signup step 2 (prestador)
+  // Signup step 2 (prestador) — múltiplas categorias
   const [signupStep, setSignupStep] = useState(1);
-  const [especialidade, setEspecialidade] = useState('');
-  const [especialidadeOutro, setEspecialidadeOutro] = useState('');
+  const [selectedCats, setSelectedCats] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const toast = useToast();
@@ -72,6 +54,12 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
     }
   };
 
+  const toggleCat = (cat) => {
+    setSelectedCats((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
+
   const handleStep1 = (e) => {
     e.preventDefault();
     if (senha !== confirmarSenha) {
@@ -94,7 +82,7 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
         email,
         senha,
         whatsapp,
-        cidade,
+        cidade: cidade || 'Não informado',
         cep,
         estado,
         rua,
@@ -112,15 +100,12 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
 
   const handleStep2 = (e) => {
     e.preventDefault();
-    if (!especialidade) { toast('Selecione uma especialidade', 'error'); return; }
-    if (especialidade === 'Outro' && !especialidadeOutro.trim()) {
-      toast('Informe sua especialidade', 'error');
+    if (selectedCats.length === 0) {
+      toast('Selecione ao menos uma especialidade', 'error');
       return;
     }
-    const esp = especialidade === 'Outro' ? especialidadeOutro.trim() : especialidade;
     doSignup({
-      especialidade: esp,
-      categorias: [esp],
+      categorias: selectedCats,
       bairros: [],
       descricao: 'Profissional autônomo cadastrado no ServiçoJá.',
     });
@@ -171,27 +156,14 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
         <form onSubmit={handleStep1} className="space-y-2">
           {/* Seletor de perfil */}
           <div className="flex gap-2 pb-1">
-            <RoleBtn
-              label="Cliente"
-              active={selectedRole === 'solicitante'}
-              onClick={() => setSelectedRole('solicitante')}
-              accent={brandAccent}
-              isPrestador={isPrestador}
-            />
-            <RoleBtn
-              label="Prestador"
-              active={selectedRole === 'prestador'}
-              onClick={() => setSelectedRole('prestador')}
-              accent={brandAccent}
-              isPrestador={isPrestador}
-            />
+            <RoleBtn label="Cliente" active={selectedRole === 'solicitante'} onClick={() => setSelectedRole('solicitante')} accent={brandAccent} isPrestador={isPrestador} />
+            <RoleBtn label="Prestador" active={selectedRole === 'prestador'} onClick={() => setSelectedRole('prestador')} accent={brandAccent} isPrestador={isPrestador} />
           </div>
 
           <Input value={nome} onChange={setNome} placeholder="Nome completo" required />
           <Input value={whatsapp} onChange={setWhatsapp} placeholder="WhatsApp (ex: 11999999999)" required />
           <Input value={email} onChange={setEmail} placeholder="E-mail" type="email" required />
 
-          {/* CEP */}
           <div className="relative">
             <input
               type="text"
@@ -203,12 +175,9 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
               required
               className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] text-text-main outline-none focus:border-accent transition pr-24"
             />
-            {cepLoading && (
-              <span className="absolute right-3 top-3 text-[12px] text-text-mute">buscando...</span>
-            )}
+            {cepLoading && <span className="absolute right-3 top-3 text-[12px] text-text-mute">buscando...</span>}
           </div>
 
-          {/* Endereço auto-preenchido */}
           <div className="flex gap-2">
             <input
               type="text"
@@ -247,7 +216,7 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
           <LinkBtn onClick={switchToLogin}>Já tem conta? Entrar →</LinkBtn>
         </form>
       ) : (
-        /* Step 2 — Especialidade do prestador */
+        /* Step 2 — Especialidades do prestador (multi-seleção) */
         <form onSubmit={handleStep2} className="space-y-3">
           <button
             type="button"
@@ -258,29 +227,35 @@ export function Welcome({ role, onLogin, onSignup, brandAccent = '#D6FF3A' }) {
           </button>
 
           <div>
-            <p className="text-[15px] font-semibold text-text-main mb-1">Qual é a sua especialidade?</p>
-            <p className="text-[12px] text-text-dim">Escolha a que melhor descreve seu trabalho principal.</p>
+            <p className="text-[15px] font-semibold text-text-main mb-0.5">Quais são suas especialidades?</p>
+            <p className="text-[12px] text-text-dim">Selecione uma ou mais. Você verá serviços dessas categorias.</p>
           </div>
 
-          <select
-            value={especialidade}
-            onChange={(e) => setEspecialidade(e.target.value)}
-            required
-            className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] text-text-main outline-none focus:border-accent transition appearance-none"
-          >
-            <option value="">Selecione uma especialidade...</option>
-            {ESPECIALIDADES.map((esp) => (
-              <option key={esp} value={esp}>{esp}</option>
-            ))}
-          </select>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIAS.map((cat) => {
+              const active = selectedCats.includes(cat);
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => toggleCat(cat)}
+                  className="px-3 py-2 rounded-xl text-[12px] font-semibold border transition"
+                  style={
+                    active
+                      ? { background: brandAccent, color: isPrestador ? '#fff' : '#0E0E10', borderColor: brandAccent }
+                      : { background: 'transparent', color: 'var(--color-text-dim,#9898A8)', borderColor: 'var(--color-border,#2E2E38)' }
+                  }
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
 
-          {especialidade === 'Outro' && (
-            <Input
-              value={especialidadeOutro}
-              onChange={setEspecialidadeOutro}
-              placeholder="Descreva sua especialidade"
-              required
-            />
+          {selectedCats.length > 0 && (
+            <p className="text-[11px] text-text-mute">
+              {selectedCats.length} selecionada{selectedCats.length > 1 ? 's' : ''}
+            </p>
           )}
 
           <Btn loading={loading} accent={brandAccent} isPrestador={isPrestador}>
@@ -339,7 +314,7 @@ function RoleBtn({ label, active, onClick, accent, isPrestador }) {
       style={
         active
           ? { background: accent, color: isPrestador ? '#fff' : '#0E0E10', borderColor: accent }
-          : { background: 'transparent', color: 'var(--color-text-dim)', borderColor: 'var(--color-border)' }
+          : { background: 'transparent', color: 'var(--color-text-dim,#9898A8)', borderColor: 'var(--color-border,#2E2E38)' }
       }
     >
       {label}

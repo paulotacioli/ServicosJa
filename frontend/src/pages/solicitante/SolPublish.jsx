@@ -11,8 +11,16 @@ export function SolPublish({ onBack }) {
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
-  const [bairro, setBairro] = useState('Pinheiros');
-  const [cidade, setCidade] = useState('São Paulo');
+
+  // Endereço
+  const [cep, setCep] = useState('');
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cidade, setCidade] = useState('');
+  const [bairro, setBairro] = useState('');
+  const [rua, setRua] = useState('');
+  const [numero, setNumero] = useState('');
+  const [complemento, setComplemento] = useState('');
+
   const [loading, setLoading] = useState(false);
 
   const addPhoto = () => {
@@ -21,16 +29,49 @@ export function SolPublish({ onBack }) {
   };
   const removePhoto = (i) => setFotos(fotos.filter((_, idx) => idx !== i));
 
+  const handleCepChange = async (val) => {
+    const cleaned = val.replace(/\D/g, '');
+    setCep(cleaned);
+    if (cleaned.length === 8) {
+      setCepLoading(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cleaned}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          setCidade(data.localidade || '');
+          setBairro(data.bairro || '');
+          setRua(data.logradouro || '');
+        } else {
+          toast('CEP não encontrado', 'error');
+        }
+      } catch {
+        toast('Erro ao buscar CEP', 'error');
+      } finally {
+        setCepLoading(false);
+      }
+    }
+  };
+
+  const canSubmit = titulo && descricao && fotos.length > 0 && cidade && bairro && numero;
+
   const submit = async () => {
     setLoading(true);
     try {
       await apiSolicitante.publicarServico({
-        titulo, descricao, categoria, fotos, cidade, bairro,
+        titulo,
+        descricao,
+        categoria,
+        fotos,
+        cidade,
+        bairro,
       });
       toast('✓ Serviço publicado. Aguarde um prestador.', 'success');
       onBack();
-    } catch (e) { toast(e.message, 'error'); }
-    finally { setLoading(false); }
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -102,22 +143,73 @@ export function SolPublish({ onBack }) {
           </select>
         </Field>
 
-        <Field label="Bairro">
+        {/* Endereço via CEP */}
+        <Field label="CEP">
+          <div className="relative">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cep}
+              onChange={(e) => handleCepChange(e.target.value)}
+              maxLength={8}
+              placeholder="Somente números"
+              className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] outline-none focus:border-accent pr-24"
+            />
+            {cepLoading && (
+              <span className="absolute right-3 top-3 text-[12px] text-text-mute">buscando...</span>
+            )}
+          </div>
+        </Field>
+
+        <div className="flex gap-2 mb-3.5">
+          <div className="flex-1">
+            <label className="block text-[11px] text-text-mute mb-1.5 uppercase tracking-wider font-semibold">Cidade</label>
+            <input
+              value={cidade} onChange={e => setCidade(e.target.value)}
+              placeholder="Preenchido pelo CEP"
+              className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] outline-none focus:border-accent"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-[11px] text-text-mute mb-1.5 uppercase tracking-wider font-semibold">Bairro</label>
+            <input
+              value={bairro} onChange={e => setBairro(e.target.value)}
+              placeholder="Preenchido pelo CEP"
+              className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+
+        <Field label="Rua">
           <input
-            value={bairro} onChange={e => setBairro(e.target.value)}
+            value={rua} onChange={e => setRua(e.target.value)}
+            placeholder="Preenchida pelo CEP"
             className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] outline-none focus:border-accent"
           />
         </Field>
 
-        <Field label="Cidade">
-          <input
-            value={cidade} onChange={e => setCidade(e.target.value)}
-            className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] outline-none focus:border-accent"
-          />
-        </Field>
+        <div className="flex gap-2 mb-3.5">
+          <div className="w-28">
+            <label className="block text-[11px] text-text-mute mb-1.5 uppercase tracking-wider font-semibold">Número *</label>
+            <input
+              value={numero} onChange={e => setNumero(e.target.value)}
+              placeholder="Ex: 42"
+              required
+              className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] outline-none focus:border-accent"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-[11px] text-text-mute mb-1.5 uppercase tracking-wider font-semibold">Complemento</label>
+            <input
+              value={complemento} onChange={e => setComplemento(e.target.value)}
+              placeholder="Apto, bloco... (opcional)"
+              className="w-full bg-surface border border-border rounded-xl px-3.5 py-3 text-[14px] outline-none focus:border-accent"
+            />
+          </div>
+        </div>
 
         <div className="mt-6">
-          <Button onClick={submit} disabled={loading || !titulo || !descricao || fotos.length === 0}>
+          <Button onClick={submit} disabled={loading || !canSubmit}>
             {loading ? '...' : 'Publicar agora'}
           </Button>
         </div>
