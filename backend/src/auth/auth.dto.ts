@@ -22,6 +22,26 @@ export class SignupDto {
 
   @IsOptional()
   @IsString()
+  cep?: string;
+
+  @IsOptional()
+  @IsString()
+  estado?: string;
+
+  @IsOptional()
+  @IsString()
+  rua?: string;
+
+  @IsOptional()
+  @IsString()
+  numero?: string;
+
+  @IsOptional()
+  @IsString()
+  complemento?: string;
+
+  @IsOptional()
+  @IsString()
   descricao?: string;
 
   @IsOptional()

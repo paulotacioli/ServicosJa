@@ -9,10 +9,9 @@ import { PrestHome } from './prestador/PrestHome';
 import { PrestAceites } from './prestador/PrestAceites';
 import { PrestAceiteDetail } from './prestador/PrestAceiteDetail';
 import { PrestConta } from './prestador/PrestConta';
-import { CATEGORIAS } from '../lib/constants';
 
 export function PrestadorApp() {
-  const { prestador, loginPrestador, signupPrestador } = useSession();
+  const { prestador, loginPrestador, signupPrestador, signupSolicitante } = useSession();
   const toast = useToast();
   const [screen, setScreen] = useState('home');
   const [selectedId, setSelectedId] = useState(null);
@@ -24,13 +23,11 @@ export function PrestadorApp() {
           role="prestador"
           onLogin={loginPrestador}
           onSignup={async (data) => {
-            // Para signup de prestador, adicionamos categorias e bairros default
-            await signupPrestador({
-              ...data,
-              categorias: CATEGORIAS.slice(0, 6),
-              bairros: ['Pinheiros', 'Vila Madalena', 'Itaim Bibi', 'Moema', 'Jardins'],
-              descricao: 'Profissional autônomo cadastrado no ServiçoJá.',
-            });
+            if (data.tipo === 'solicitante') {
+              await signupSolicitante(data);
+            } else {
+              await signupPrestador(data);
+            }
           }}
           brandAccent="#60A5FA"
         />

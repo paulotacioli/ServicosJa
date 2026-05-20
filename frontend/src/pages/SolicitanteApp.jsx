@@ -12,7 +12,7 @@ import { SolNotif } from './solicitante/SolNotif';
 import { SolConta } from './solicitante/SolConta';
 
 export function SolicitanteApp() {
-  const { solicitante, loginSolicitante, signupSolicitante } = useSession();
+  const { solicitante, loginSolicitante, signupSolicitante, signupPrestador } = useSession();
   const [screen, setScreen] = useState('home');
   const [selectedServiceId, setSelectedServiceId] = useState(null);
   const [selectedPrestadorId, setSelectedPrestadorId] = useState(null);
@@ -24,7 +24,13 @@ export function SolicitanteApp() {
         <Welcome
           role="solicitante"
           onLogin={loginSolicitante}
-          onSignup={signupSolicitante}
+          onSignup={async (data) => {
+            if (data.tipo === 'prestador') {
+              await signupPrestador(data);
+            } else {
+              await signupSolicitante(data);
+            }
+          }}
           brandAccent="#D6FF3A"
         />
       </Phone>
