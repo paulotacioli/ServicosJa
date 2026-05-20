@@ -1,0 +1,94 @@
+// Schema Prisma — ServiçoJá
+// Para migrar para PostgreSQL, troque provider para "postgresql"
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// === USUÁRIO ===
+model Usuario {
+  id           String   @id @default(uuid())
+  tipo         String   // "solicitante" | "prestador"
+  nome         String
+  email        String   @unique
+  senhaHash    String
+  whatsapp     String
+  cidade       String
+  foto         String?
+  descricao    String?
+  // Prestador-only (CSV no SQLite, array no Postgres)
+  categorias   String?  // ex: "Elétrica,Pintura"
+  bairros      String?  // ex: "Pinheiros,Vila Madalena"
+  servicosConcluidos Int @default(0)
+  criadoEm     DateTime @default(now())
+  ativo        Boolean  @default(true)
+
+  servicosComoSolicitante Servico[] @relation("ServicoSolicitante")
+  servicosComoPrestador   Servico[] @relation("ServicoPrestador")
+  acoes                   AcaoServico[]
+  notificacoes            Notificacao[]
+}
+
+// === SERVIÇO ===
+model Servico {
+  id           String   @id @default(uuid())
+  titulo       String
+  descricao    String
+  categoria    String
+  fotos        String   // CSV de URLs
+  cidade       String
+  bairro       String
+  estado       String   @default("ABERTO") // ABERTO | AGUARDANDO_APROVACAO | APROVADO | CONCLUIDO | CANCELADO
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  solicitanteId String
+  solicitante   Usuario @relation("ServicoSolicitante", fields: [solicitanteId], references: [id])
+
+  prestadorAceitoId String?
+  prestadorAceito   Usuario? @relation("ServicoPrestador", fields: [prestadorAceitoId], references: [id])
+
+  acoes        AcaoServico[]
+  notificacoes Notificacao[]
+
+  @@index([estado])
+  @@index([solicitanteId])
+  @@index([prestadorAceitoId])
+}
+
+// === AÇÃO SOBRE SERVIÇO (auditoria + bloqueio de re-exibição) ===
+model AcaoServico {
+  id          String   @id @default(uuid())
+  servicoId   String
+  prestadorId String
+  acao        String   // ACEITOU | RECUSOU | APROVADO_PELO_CLIENTE | RECUSADO_PELO_CLIENTE
+  motivo      String?
+  criadoEm    DateTime @default(now())
+
+  servico   Servico @relation(fields: [servicoId], references: [id])
+  prestador Usuario @relation(fields: [prestadorId], references: [id])
+
+  @@index([prestadorId, servicoId])
+}
+
+// === NOTIFICAÇÃO ===
+model Notificacao {
+  id        String   @id @default(uuid())
+  usuarioId String
+  tipo      String
+  titulo    String
+  mensagem  String
+  servicoId String?
+  lida      Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+
+  usuario Usuario  @relation(fields: [usuarioId], references: [id])
+  servico Servico? @relation(fields: [servicoId], references: [id])
+
+  @@index([usuarioId, lida])
+}
