@@ -22,18 +22,18 @@ export function PrestHome() {
 
   useEffect(() => { loadFeed(); }, []);
 
-  const onSwipe = async (dir) => {
+  const onSwipe = (dir) => {
     const s = feed[idx];
     if (!s) return;
-    try {
-      if (dir === 'yes') {
-        await apiPrestador.aceitarServico(s.id);
-        toast('✓ Aceito! O cliente foi avisado.', 'success');
-      } else {
-        await apiPrestador.recusarServicoSwipe(s.id);
-      }
-    } catch (e) { toast(e.message, 'error'); }
-    setIdx(idx + 1);
+    setIdx((prev) => prev + 1);
+    if (dir === 'yes') {
+      apiPrestador.aceitarServico(s.id)
+        .then(() => toast('✓ Aceito! O cliente foi avisado.', 'success'))
+        .catch((e) => toast(e.message, 'error'));
+    } else {
+      apiPrestador.recusarServicoSwipe(s.id)
+        .catch((e) => toast(e.message, 'error'));
+    }
   };
 
   const empty = idx >= feed.length;
