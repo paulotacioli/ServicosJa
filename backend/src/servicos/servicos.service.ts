@@ -219,7 +219,6 @@ export class ServicosService {
       where: {
         estado: ESTADO.ABERTO,
         id: { notIn: bloqueados },
-        ...(categorias.length ? { categoria: { in: categorias } } : {}),
       },
       orderBy: { criadoEm: 'desc' },
     });
