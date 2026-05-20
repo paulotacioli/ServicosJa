@@ -39,7 +39,7 @@ export function PrestadorApp() {
 
   return (
     <Phone label="App do Prestador" accentColor="blue">
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="h-full overflow-hidden flex flex-col">
         {screen === 'home' && <PrestHome />}
         {screen === 'aceites' && <PrestAceites onOpen={goAceiteDetail} />}
         {screen === 'aceite-detail' && <PrestAceiteDetail serviceId={selectedId} onBack={() => setScreen('aceites')} />}

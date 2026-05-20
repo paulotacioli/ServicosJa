@@ -44,7 +44,7 @@ export function SolicitanteApp() {
 
   return (
     <Phone label="App do Solicitante" accentColor="accent">
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="h-full overflow-hidden flex flex-col">
         {screen === 'home' && <SolHome onOpenService={goToDetail} onPublish={() => setScreen('publish')} onNotif={() => setScreen('notif')} hasUnread={hasUnread} />}
         {screen === 'publish' && <SolPublish onBack={() => setScreen('home')} />}
         {screen === 'detail' && <SolDetail serviceId={selectedServiceId} onBack={() => setScreen('home')} onPrestProfile={goToPrestProfile} />}
