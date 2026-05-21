@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "ServiçoJá",
+    "slug": "servicoja",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "servicoja",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0E0E10",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.servicoja.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0E0E10"
+      },
+      "package": "com.servicoja.app"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
