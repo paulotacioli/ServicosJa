@@ -230,6 +230,11 @@ export class ServicosService {
   async aceitar(servicoId: string, prestadorId: string) {
     // Transação com checagem de estado (equivalente a SELECT FOR UPDATE)
     return this.prisma.$transaction(async (tx) => {
+      const prestador = await tx.usuario.findUnique({ where: { id: prestadorId } });
+      if (prestador?.statusVerificacao !== 'APROVADO') {
+        throw new ForbiddenException('Sua conta ainda não foi verificada. Aguarde a aprovação.');
+      }
+
       const s = await tx.servico.findUnique({ where: { id: servicoId } });
       if (!s) throw new NotFoundException('Serviço não encontrado');
       if (s.estado !== ESTADO.ABERTO) {

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
@@ -11,6 +11,11 @@ export class UsersController {
   @Get('me')
   me(@CurrentUser() u: AuthUser) {
     return this.users.getMe(u.id);
+  }
+
+  @Patch('me/verificacao')
+  updateVerificacao(@CurrentUser() u: AuthUser, @Body() body: { status: string }) {
+    return this.users.updateStatusVerificacao(u.id, body.status);
   }
 
   @Get('prestadores/:id')

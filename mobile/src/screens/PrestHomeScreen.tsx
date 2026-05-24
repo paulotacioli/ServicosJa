@@ -13,6 +13,17 @@ import { timeAgo } from '../lib/helpers';
 const SCREEN_W = Dimensions.get('window').width;
 const SWIPE_THRESHOLD = 100;
 
+const VERIFICACAO_LABEL: Record<string, string> = {
+  PENDENTE: 'Conta em análise — você pode ver o feed, mas não pode aceitar serviços ainda.',
+  EM_REVISAO: 'Sua conta está em revisão. Aguarde a aprovação.',
+  REPROVADO: 'Sua conta não foi aprovada. Entre em contato com o suporte.',
+};
+const VERIFICACAO_COLOR: Record<string, string> = {
+  PENDENTE: '#B45309',
+  EM_REVISAO: '#1D4ED8',
+  REPROVADO: '#B91C1C',
+};
+
 export function PrestHomeScreen() {
   const { user } = useAuth();
   const toast = useToast();
@@ -29,9 +40,15 @@ export function PrestHomeScreen() {
 
   useEffect(() => { loadFeed(); }, []);
 
+  const aprovado = user?.statusVerificacao === 'APROVADO';
+
   const handleSwipe = (dir: 'yes' | 'no') => {
     const s = feed[idx];
     if (!s) return;
+    if (dir === 'yes' && !aprovado) {
+      toast('Aguarde a verificação da sua conta para aceitar serviços.', 'error');
+      return;
+    }
     setIdx(prev => prev + 1);
     if (dir === 'yes') {
       api.aceitarServico(s.id)
@@ -58,6 +75,14 @@ export function PrestHomeScreen() {
         }
       />
 
+      {!aprovado && (
+        <View style={[s.banner, { backgroundColor: VERIFICACAO_COLOR[user?.statusVerificacao ?? 'PENDENTE'] }]}>
+          <Text style={s.bannerText}>
+            {VERIFICACAO_LABEL[user?.statusVerificacao ?? 'PENDENTE']}
+          </Text>
+        </View>
+      )}
+
       <View style={s.cardArea}>
         {empty ? (
           <View style={s.emptyWrap}>
@@ -78,8 +103,12 @@ export function PrestHomeScreen() {
           <TouchableOpacity onPress={() => handleSwipe('no')} style={[s.btn, s.btnNo]} activeOpacity={0.8}>
             <Icons.X color={C.red} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleSwipe('yes')} style={[s.btn, s.btnYes]} activeOpacity={0.8}>
-            <Icons.Check color={C.bg} />
+          <TouchableOpacity
+            onPress={() => handleSwipe('yes')}
+            style={[s.btn, s.btnYes, !aprovado && s.btnDisabled]}
+            activeOpacity={0.8}
+          >
+            <Icons.Check color={aprovado ? C.bg : C.textMute} />
           </TouchableOpacity>
         </View>
       )}
@@ -177,6 +206,9 @@ const s = StyleSheet.create({
   btn: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   btnNo: { backgroundColor: C.surface, borderWidth: 2, borderColor: C.red },
   btnYes: { backgroundColor: C.green },
+  btnDisabled: { backgroundColor: C.surface, borderWidth: 2, borderColor: C.border },
+  banner: { marginHorizontal: 16, marginBottom: 4, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  bannerText: { fontSize: 12, color: '#fff', fontWeight: '600', lineHeight: 18 },
 });
 
 const sc = StyleSheet.create({

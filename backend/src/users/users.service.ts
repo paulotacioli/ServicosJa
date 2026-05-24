@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -26,6 +26,13 @@ export class UsersService {
    * Retorna perfil público do prestador.
    * O WhatsApp só é revelado se existe um serviço APROVADO entre solicitante e prestador.
    */
+  async updateStatusVerificacao(userId: string, status: string) {
+    const valid = ['PENDENTE', 'EM_REVISAO', 'APROVADO', 'REPROVADO'];
+    if (!valid.includes(status)) throw new BadRequestException('Status inválido');
+    await this.prisma.usuario.update({ where: { id: userId }, data: { statusVerificacao: status } });
+    return this.getMe(userId);
+  }
+
   async getPrestadorProfile(prestadorId: string, viewerId: string) {
     const prestador = await this.prisma.usuario.findUnique({ where: { id: prestadorId } });
     if (!prestador || prestador.tipo !== 'prestador') {

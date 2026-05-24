@@ -29,7 +29,8 @@ model Usuario {
   // Prestador-only (CSV no SQLite, array no Postgres)
   categorias   String?  // ex: "Elétrica,Pintura"
   bairros      String?  // ex: "Pinheiros,Vila Madalena"
-  servicosConcluidos Int @default(0)
+  servicosConcluidos  Int    @default(0)
+  statusVerificacao   String @default("PENDENTE") // PENDENTE | EM_REVISAO | APROVADO | REPROVADO
   criadoEm     DateTime @default(now())
   ativo        Boolean  @default(true)
 

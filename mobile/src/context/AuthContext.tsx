@@ -12,6 +12,7 @@ export interface User {
   bairros?: string[];
   descricao?: string;
   servicosConcluidos?: number;
+  statusVerificacao?: 'PENDENTE' | 'EM_REVISAO' | 'APROVADO' | 'REPROVADO';
   role: 'solicitante' | 'prestador';
 }
 
@@ -21,6 +22,7 @@ interface AuthContextType {
   login: (email: string, senha: string, role: 'solicitante' | 'prestador') => Promise<void>;
   signup: (data: Record<string, unknown>) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -42,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, senha: string, role: 'solicitante' | 'prestador') => {
     const res = await api.login({ email, senha, tipo: role });
     const userData: User = { ...res.user, role };
-    await AsyncStorage.multiSet([['token', res.access_token], ['user', JSON.stringify(userData)]]);
+    await AsyncStorage.multiSet([['token', res.token], ['user', JSON.stringify(userData)]]);
     setUser(userData);
   };
 
@@ -50,8 +52,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const role = data.tipo as 'solicitante' | 'prestador';
     const res = await api.signup(data);
     const userData: User = { ...res.user, role };
-    await AsyncStorage.multiSet([['token', res.access_token], ['user', JSON.stringify(userData)]]);
+    await AsyncStorage.multiSet([['token', res.token], ['user', JSON.stringify(userData)]]);
     setUser(userData);
+  };
+
+  const refreshUser = async () => {
+    try {
+      const fresh = await api.me();
+      const role = user?.role ?? (fresh.tipo as 'solicitante' | 'prestador');
+      const userData: User = { ...fresh, role };
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+    } catch {}
   };
 
   const logout = async () => {
@@ -60,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

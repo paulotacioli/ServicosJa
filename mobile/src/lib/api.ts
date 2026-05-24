@@ -3,20 +3,30 @@ import { Platform } from 'react-native';
 
 // Altere este endereço para o IP do seu servidor em produção.
 // Android Emulator → 10.0.2.2 | iOS Simulator → localhost
-const API_BASE = Platform.OS === 'android'
-  ? 'http://10.0.2.2:3000/api'
-  : 'http://localhost:3000/api';
+const API_BASE = 'http://192.168.1.5:3000/api';
 
 async function request(method: string, path: string, body?: unknown): Promise<any> {
   const token = await AsyncStorage.getItem('token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (e: any) {
+    if (e.name === 'AbortError') throw new Error('Servidor não respondeu. Verifique sua conexão.');
+    throw new Error('Não foi possível conectar ao servidor.');
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     let msg = 'Erro na requisição';
@@ -38,6 +48,7 @@ export const api = {
 
   // Users
   me: () => request('GET', '/me'),
+  updateVerificacao: (status: string) => request('PATCH', '/me/verificacao', { status }),
   getPrestador: (id: string) => request('GET', `/prestadores/${id}`),
 
   // Solicitante

@@ -18,7 +18,9 @@
       "package": "com.servicoja.app"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
