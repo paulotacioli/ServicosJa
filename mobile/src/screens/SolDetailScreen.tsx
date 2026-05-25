@@ -25,14 +25,12 @@ export function SolDetailScreen() {
     return () => clearInterval(timer);
   }, [id]);
 
-  const aprovar = async () => {
-    try { await api.aprovarPrestador(servico.id); toast('✓ Prestador aprovado.', 'success'); reload(); }
-    catch (e: any) { toast(e.message, 'error'); }
-  };
-
-  const recusar = async () => {
-    try { await api.recusarPrestador(servico.id); toast('Serviço voltou à fila.', 'success'); router.back(); }
-    catch (e: any) { toast(e.message, 'error'); }
+  const aprovar = async (prestadorId: string) => {
+    try {
+      await api.aprovarPrestador(servico.id, prestadorId);
+      toast('✓ Prestador aprovado.', 'success');
+      reload();
+    } catch (e: any) { toast(e.message, 'error'); }
   };
 
   const concluir = async () => {
@@ -50,6 +48,23 @@ export function SolDetailScreen() {
     ]);
   };
 
+  const editar = () => {
+    router.push({
+      pathname: '/publish',
+      params: {
+        editId: servico.id,
+        editData: JSON.stringify({
+          titulo: servico.titulo,
+          descricao: servico.descricao,
+          categoria: servico.categoria,
+          fotos: servico.fotos,
+          cidade: servico.cidade,
+          bairro: servico.bairro,
+        }),
+      },
+    });
+  };
+
   const abrirWhatsApp = () => {
     const num = servico.prestadorAceito?.whatsapp?.replace(/\D/g, '') || '';
     Linking.openURL(`https://wa.me/${num}?text=${encodeURIComponent('Olá! Vi seu perfil no ServiçoJá sobre: ' + servico.titulo)}`);
@@ -63,10 +78,23 @@ export function SolDetailScreen() {
   );
 
   const p = servico.prestadorAceito;
+  const aceites: any[] = servico.aceites || [];
+  const temAceites = aceites.length > 0;
+  const podeEditar = servico.estado === 'ABERTO' && aceites.length === 0;
 
   return (
     <View style={s.root}>
-      <Header onBack={() => router.back()} title="" />
+      <Header
+        onBack={() => router.back()}
+        title=""
+        right={
+          podeEditar ? (
+            <TouchableOpacity onPress={editar} style={s.editBtn} activeOpacity={0.7}>
+              <Text style={s.editBtnText}>Editar</Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
       <ScrollView showsVerticalScrollIndicator={false}>
         {servico.fotos[0] ? (
           <Image source={{ uri: servico.fotos[0] }} style={s.hero} />
@@ -87,34 +115,69 @@ export function SolDetailScreen() {
           <Text style={s.title}>{servico.titulo}</Text>
           <Text style={s.desc}>{servico.descricao}</Text>
 
-          {servico.estado === 'AGUARDANDO_APROVACAO' && p && (
+          {/* ABERTO com aceites: mostrar candidatos */}
+          {servico.estado === 'ABERTO' && temAceites && (
             <>
-              <SectionTitle>Um prestador aceitou</SectionTitle>
-              <View style={s.prestCard}>
-                <View style={s.prestRow}>
-                  <Avatar name={p.nome} size={48} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.prestName}>{p.nome}</Text>
-                    <Text style={s.prestCity}>{p.cidade}</Text>
+              <SectionTitle>
+                {aceites.length === 1
+                  ? '1 prestador interessado'
+                  : `${aceites.length} prestadores interessados`}
+              </SectionTitle>
+              {aceites.map((aceite: any) => {
+                const pr = aceite.prestador;
+                return (
+                  <View key={pr.id} style={s.prestCard}>
+                    <View style={s.prestRow}>
+                      <Avatar name={pr.nome} size={48} foto={pr.foto} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.prestName}>{pr.nome}</Text>
+                        <Text style={s.prestCity}>{pr.cidade}</Text>
+                      </View>
+                      {aceite.valorProposto != null && (
+                        <View style={s.valorBadge}>
+                          <Text style={s.valorLabel}>Valor</Text>
+                          <Text style={s.valorText}>
+                            R$ {Number(aceite.valorProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={s.statsRow}>
+                      <View><Text style={s.statN}>{pr.servicosConcluidos || 0}</Text><Text style={s.statL}>Concluídos</Text></View>
+                      <View><Text style={s.statN}>{(pr.categorias || []).length}</Text><Text style={s.statL}>Categorias</Text></View>
+                    </View>
+                    <View style={s.btnRow}>
+                      <View style={{ flex: 1 }}>
+                        <Button variant="ghost" onPress={() => router.push(`/prest-profile/${pr.id}`)}>Ver perfil</Button>
+                      </View>
+                      <View style={{ width: 8 }} />
+                      <View style={{ flex: 1 }}>
+                        <Button variant="success" onPress={() => aprovar(pr.id)}>Aprovar</Button>
+                      </View>
+                    </View>
                   </View>
-                </View>
-                <View style={s.statsRow}>
-                  <View><Text style={s.statN}>{p.servicosConcluidos || 0}</Text><Text style={s.statL}>Concluídos</Text></View>
-                  <View><Text style={s.statN}>{(p.categorias || []).length}</Text><Text style={s.statL}>Categorias</Text></View>
-                </View>
-                <View style={s.btnRow}>
-                  <View style={{ flex: 1 }}>
-                    <Button variant="ghost" onPress={() => router.push(`/prest-profile/${p.id}`)}>Ver perfil</Button>
-                  </View>
-                  <View style={{ width: 8 }} />
-                  <View style={{ flex: 1 }}>
-                    <Button variant="success" onPress={aprovar}>Aprovar</Button>
-                  </View>
-                </View>
-                <View style={{ height: 8 }} />
-                <Button variant="danger" onPress={recusar}>Recusar — devolver à fila</Button>
-              </View>
+                );
+              })}
             </>
+          )}
+
+          {/* ABERTO sem aceites */}
+          {servico.estado === 'ABERTO' && !temAceites && (
+            <>
+              <View style={s.waitBox}>
+                <Text style={s.waitEmoji}>⏳</Text>
+                <Text style={s.waitTitle}>Aguardando prestadores</Text>
+                <Text style={s.waitSub}>Seu serviço está visível para profissionais da categoria.</Text>
+              </View>
+              <Button variant="ghost" onPress={cancelar}>Cancelar serviço</Button>
+            </>
+          )}
+
+          {/* ABERTO com aceites: opção de cancelar */}
+          {servico.estado === 'ABERTO' && temAceites && (
+            <View style={{ marginTop: 8 }}>
+              <Button variant="ghost" onPress={cancelar}>Cancelar serviço</Button>
+            </View>
           )}
 
           {servico.estado === 'APROVADO' && p && (
@@ -122,7 +185,7 @@ export function SolDetailScreen() {
               <SectionTitle>Prestador aprovado</SectionTitle>
               <View style={s.card}>
                 <View style={s.prestRow}>
-                  <Avatar name={p.nome} size={48} />
+                  <Avatar name={p.nome} size={48} foto={p.foto} />
                   <View><Text style={s.prestName}>{p.nome}</Text><Text style={s.prestCity}>{p.cidade}</Text></View>
                 </View>
               </View>
@@ -136,17 +199,6 @@ export function SolDetailScreen() {
               <Button variant="wpp" onPress={abrirWhatsApp}>Abrir conversa no WhatsApp</Button>
               <View style={{ height: 10 }} />
               <Button variant="ghost" onPress={concluir}>Marcar como concluído</Button>
-            </>
-          )}
-
-          {servico.estado === 'ABERTO' && (
-            <>
-              <View style={s.waitBox}>
-                <Text style={s.waitEmoji}>⏳</Text>
-                <Text style={s.waitTitle}>Aguardando prestadores</Text>
-                <Text style={s.waitSub}>Seu serviço está visível para profissionais da categoria.</Text>
-              </View>
-              <Button variant="ghost" onPress={cancelar}>Cancelar serviço</Button>
             </>
           )}
 
@@ -183,6 +235,12 @@ const s = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '800', color: C.textMain, marginBottom: 10, lineHeight: 30 },
   desc: { fontSize: 14, color: C.textDim, lineHeight: 22, marginBottom: 6 },
 
+  editBtn: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10,
+  },
+  editBtnText: { fontSize: 13, fontWeight: '700', color: C.textMain },
+
   prestCard: {
     backgroundColor: 'rgba(214,255,58,0.04)', borderWidth: 1,
     borderColor: C.accent, borderRadius: 16, padding: 16, marginBottom: 12,
@@ -195,6 +253,13 @@ const s = StyleSheet.create({
   statN: { fontSize: 16, fontWeight: '800', color: C.textMain },
   statL: { fontSize: 10, color: C.textMute, textTransform: 'uppercase', letterSpacing: 0.5 },
   btnRow: { flexDirection: 'row' },
+
+  valorBadge: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center',
+  },
+  valorLabel: { fontSize: 9, fontWeight: '700', color: C.textMute, textTransform: 'uppercase', letterSpacing: 0.5 },
+  valorText: { fontSize: 14, fontWeight: '800', color: C.accent, marginTop: 2 },
 
   wppBlock: {
     borderRadius: 16, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 14,

@@ -31,6 +31,7 @@ export class AuthService {
         numero: dto.numero,
         complemento: dto.complemento,
         descricao: dto.descricao,
+        foto: dto.foto || null,
         categorias: dto.categorias?.join(',') || null,
         bairros: dto.bairros?.join(',') || null,
       },

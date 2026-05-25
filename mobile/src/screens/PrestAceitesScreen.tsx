@@ -2,8 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { api } from '../lib/api';
-import { Header, SectionTitle, Badge, EmptyCard, Loader } from '../components/UI';
+import { Header, SectionTitle, EmptyCard, Loader } from '../components/UI';
 import { C } from '../lib/colors';
+
+const RESULTADO_LABEL: Record<string, { label: string; color: string }> = {
+  AGUARDANDO:    { label: 'Aguardando cliente', color: '#FB923C' },
+  APROVADO:      { label: 'Aprovado! 🎉',        color: '#34D399' },
+  CONCLUIDO:     { label: 'Concluído ✓',          color: '#A1A1AA' },
+  NAO_SELECIONADO: { label: 'Não selecionado',   color: '#F87171' },
+};
 
 export function PrestAceitesScreen() {
   const [aceites, setAceites] = useState<any[]>([]);
@@ -23,10 +30,10 @@ export function PrestAceitesScreen() {
   }, []);
 
   const grupos: Record<string, any[]> = {
-    'Aguardando cliente decidir': aceites.filter(s => s.estado === 'AGUARDANDO_APROVACAO'),
-    'Aprovados': aceites.filter(s => s.estado === 'APROVADO'),
-    'Concluídos': aceites.filter(s => s.estado === 'CONCLUIDO'),
-    'Outros': aceites.filter(s => !['AGUARDANDO_APROVACAO', 'APROVADO', 'CONCLUIDO'].includes(s.estado)),
+    'Aguardando cliente decidir': aceites.filter(s => s.resultado === 'AGUARDANDO'),
+    'Aprovados': aceites.filter(s => s.resultado === 'APROVADO'),
+    'Concluídos': aceites.filter(s => s.resultado === 'CONCLUIDO'),
+    'Não selecionados': aceites.filter(s => s.resultado === 'NAO_SELECIONADO'),
   };
 
   if (loading) return <View style={s.root}><Header title="Meus aceites" /><Loader /></View>;
@@ -43,23 +50,35 @@ export function PrestAceitesScreen() {
           return (
             <View key={titulo}>
               <SectionTitle>{titulo}</SectionTitle>
-              {items.map((item: any) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => router.push(`/aceite/${item.id}`)}
-                  style={s.card}
-                  activeOpacity={0.7}
-                >
-                  <Image source={{ uri: item.fotos[0] }} style={s.img} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.title} numberOfLines={1}>{item.titulo}</Text>
-                    <View style={s.meta}>
-                      <Badge estado={item.estado} />
-                      <Text style={s.bairro}> · {item.bairro}</Text>
+              {items.map((item: any) => {
+                const resultado = RESULTADO_LABEL[item.resultado] || RESULTADO_LABEL.AGUARDANDO;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => router.push(`/aceite/${item.id}`)}
+                    style={s.card}
+                    activeOpacity={0.7}
+                  >
+                    {item.fotos?.[0] ? (
+                      <Image source={{ uri: item.fotos[0] }} style={s.img} />
+                    ) : (
+                      <View style={[s.img, { backgroundColor: C.surface2 }]} />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.title} numberOfLines={1}>{item.titulo}</Text>
+                      <View style={s.meta}>
+                        <Text style={[s.resultado, { color: resultado.color }]}>{resultado.label}</Text>
+                        <Text style={s.bairro}> · {item.bairro}</Text>
+                      </View>
+                      {item.valorProposto != null && (
+                        <Text style={s.valor}>
+                          Seu valor: R$ {Number(item.valorProposto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </Text>
+                      )}
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           );
         })}
@@ -78,7 +97,9 @@ const s = StyleSheet.create({
     borderRadius: 16, padding: 14, marginBottom: 10,
   },
   img: { width: 60, height: 60, borderRadius: 12, backgroundColor: C.surface2 },
-  title: { fontSize: 14, fontWeight: '700', color: C.textMain, marginBottom: 6 },
+  title: { fontSize: 14, fontWeight: '700', color: C.textMain, marginBottom: 4 },
   meta: { flexDirection: 'row', alignItems: 'center' },
+  resultado: { fontSize: 11, fontWeight: '700' },
   bairro: { fontSize: 11, color: C.textMute },
+  valor: { fontSize: 11, color: C.textMute, marginTop: 3 },
 });

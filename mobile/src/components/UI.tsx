@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, ViewStyle, TextStyle,
+  View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, ViewStyle, Image,
 } from 'react-native';
 import { C } from '../lib/colors';
 import { badgeInfo, EstadoServico, initials } from '../lib/helpers';
@@ -31,10 +31,14 @@ export function EmptyCard({ children }: { children: React.ReactNode }) {
 }
 
 // ── Avatar ──────────────────────────────────────────────────────────────
-export function Avatar({ name, size = 48 }: { name: string; size?: number }) {
+export function Avatar({ name, size = 48, foto }: { name: string; size?: number; foto?: string | null }) {
   return (
     <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[s.avatarText, { fontSize: size * 0.36 }]}>{initials(name)}</Text>
+      {foto ? (
+        <Image source={{ uri: foto }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+      ) : (
+        <Text style={[s.avatarText, { fontSize: size * 0.36 }]}>{initials(name)}</Text>
+      )}
     </View>
   );
 }

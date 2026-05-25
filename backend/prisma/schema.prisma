@@ -72,9 +72,10 @@ model AcaoServico {
   id          String   @id @default(uuid())
   servicoId   String
   prestadorId String
-  acao        String   // ACEITOU | RECUSOU | APROVADO_PELO_CLIENTE | RECUSADO_PELO_CLIENTE
-  motivo      String?
-  criadoEm    DateTime @default(now())
+  acao           String   // ACEITOU | RECUSOU | APROVADO_PELO_CLIENTE | RECUSADO_PELO_CLIENTE
+  motivo         String?
+  valorProposto  Float?
+  criadoEm       DateTime @default(now())
 
   servico   Servico @relation(fields: [servicoId], references: [id])
   prestador Usuario @relation(fields: [prestadorId], references: [id])

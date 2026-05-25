@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
+  Alert, Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { C } from '../lib/colors';
@@ -37,6 +39,8 @@ export function WelcomeScreen() {
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [cepLoading, setCepLoading] = useState(false);
+  const [fotoUri, setFotoUri] = useState<string | null>(null);
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
 
   // Signup step 2
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
@@ -61,6 +65,52 @@ export function WelcomeScreen() {
     }
   };
 
+  const pickPhoto = () => {
+    Alert.alert(
+      'Foto de perfil',
+      'Escolha uma opção',
+      [
+        {
+          text: 'Câmera',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') { toast('Permissão de câmera negada', 'error'); return; }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.5,
+              base64: true,
+            });
+            if (!result.canceled && result.assets[0]) {
+              setFotoUri(result.assets[0].uri);
+              setFotoBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            }
+          },
+        },
+        {
+          text: 'Biblioteca',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') { toast('Permissão de galeria negada', 'error'); return; }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.5,
+              base64: true,
+            });
+            if (!result.canceled && result.assets[0]) {
+              setFotoUri(result.assets[0].uri);
+              setFotoBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            }
+          },
+        },
+        { text: 'Cancelar', style: 'cancel' },
+      ]
+    );
+  };
+
   const handleLogin = async () => {
     setLoading(true);
     try {
@@ -82,7 +132,9 @@ export function WelcomeScreen() {
       await signup({
         tipo: role, nome, email, senha, whatsapp,
         cidade: cidade || 'Não informado', cep, estado, rua, numero,
-        complemento: complemento || undefined, ...extra,
+        complemento: complemento || undefined,
+        foto: fotoBase64 || undefined,
+        ...extra,
       });
     } catch (e: any) {
       toast(e.message, 'error');
@@ -112,7 +164,6 @@ export function WelcomeScreen() {
 
         {mode === 'login' ? (
           <>
-            {/* Role selector */}
             <View style={s.roleRow}>
               {(['solicitante', 'prestador'] as Role[]).map(r => (
                 <TouchableOpacity
@@ -163,6 +214,25 @@ export function WelcomeScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+
+            {/* Foto de perfil */}
+            <View style={s.photoSection}>
+              <TouchableOpacity onPress={pickPhoto} style={s.photoBtn} activeOpacity={0.8}>
+                {fotoUri ? (
+                  <Image source={{ uri: fotoUri }} style={s.photoPreview} />
+                ) : (
+                  <View style={s.photoPlaceholder}>
+                    <Text style={s.photoIcon}>📷</Text>
+                    <Text style={s.photoLabel}>Adicionar foto</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {fotoUri && (
+                <TouchableOpacity onPress={() => { setFotoUri(null); setFotoBase64(null); }} style={s.photoRemoveBtn}>
+                  <Text style={s.photoRemoveText}>Remover</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <Field label="Nome completo">
@@ -296,6 +366,19 @@ const s = StyleSheet.create({
     borderColor: C.border, alignItems: 'center',
   },
   roleBtnText: { fontSize: 13, fontWeight: '700', color: C.textDim },
+
+  photoSection: { alignItems: 'center', marginBottom: 20 },
+  photoBtn: {
+    width: 100, height: 100, borderRadius: 50,
+    overflow: 'hidden', backgroundColor: C.surface,
+    borderWidth: 2, borderColor: C.border, borderStyle: 'dashed',
+  },
+  photoPreview: { width: '100%', height: '100%' },
+  photoPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  photoIcon: { fontSize: 28 },
+  photoLabel: { fontSize: 11, color: C.textMute, fontWeight: '600' },
+  photoRemoveBtn: { marginTop: 8 },
+  photoRemoveText: { fontSize: 12, color: C.red },
 
   fieldLabel: { fontSize: 11, fontWeight: '700', color: C.textMute, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 },
   input: {

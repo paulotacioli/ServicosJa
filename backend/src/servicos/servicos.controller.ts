@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { ServicosService } from './servicos.service';
-import { CreateServicoDto, RecusarPrestadorDto } from './servicos.dto';
+import { AceitarServicoDto, AprovarPrestadorDto, CreateServicoDto, EditarServicoDto } from './servicos.dto';
 
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -13,6 +13,11 @@ export class ServicosController {
   @Post('servicos')
   publicar(@Body() dto: CreateServicoDto, @CurrentUser() u: AuthUser) {
     return this.servicos.publicar(u.id, dto);
+  }
+
+  @Patch('servicos/:id')
+  editar(@Param('id') id: string, @Body() dto: EditarServicoDto, @CurrentUser() u: AuthUser) {
+    return this.servicos.editar(id, u.id, dto);
   }
 
   @Get('servicos/meus')
@@ -26,13 +31,8 @@ export class ServicosController {
   }
 
   @Post('servicos/:id/aprovar')
-  aprovar(@Param('id') id: string, @CurrentUser() u: AuthUser) {
-    return this.servicos.aprovar(id, u.id);
-  }
-
-  @Post('servicos/:id/recusar')
-  recusar(@Param('id') id: string, @Body() dto: RecusarPrestadorDto, @CurrentUser() u: AuthUser) {
-    return this.servicos.recusar(id, u.id, dto.motivo);
+  aprovar(@Param('id') id: string, @Body() dto: AprovarPrestadorDto, @CurrentUser() u: AuthUser) {
+    return this.servicos.aprovar(id, u.id, dto);
   }
 
   @Post('servicos/:id/concluir')
@@ -52,8 +52,8 @@ export class ServicosController {
   }
 
   @Post('feed/:id/aceitar')
-  aceitar(@Param('id') id: string, @CurrentUser() u: AuthUser) {
-    return this.servicos.aceitar(id, u.id);
+  aceitar(@Param('id') id: string, @Body() dto: AceitarServicoDto, @CurrentUser() u: AuthUser) {
+    return this.servicos.aceitar(id, u.id, dto);
   }
 
   @Post('feed/:id/recusar')

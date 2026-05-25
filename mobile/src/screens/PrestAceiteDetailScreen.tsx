@@ -26,13 +26,15 @@ export function PrestAceiteDetailScreen() {
     </View>
   );
 
+  const meuValor = servico.meuValorProposto;
+
   let statusBlock = null;
-  if (servico.estado === 'AGUARDANDO_APROVACAO') {
+  if (servico.estado === 'ABERTO') {
     statusBlock = (
       <View style={s.statusBox}>
         <Text style={s.statusEmoji}>⏳</Text>
         <Text style={s.statusTitle}>Aguardando cliente</Text>
-        <Text style={s.statusSub}>Você foi o primeiro a aceitar. Agora o cliente decide.</Text>
+        <Text style={s.statusSub}>Outros prestadores também podem ter aceitado. O cliente escolhe quem vai fazer.</Text>
       </View>
     );
   } else if (servico.estado === 'APROVADO') {
@@ -53,7 +55,7 @@ export function PrestAceiteDetailScreen() {
   } else {
     statusBlock = (
       <View style={[s.statusBox, { borderColor: C.red }]}>
-        <Text style={[s.statusTitle, { color: C.red }]}>Cliente recusou</Text>
+        <Text style={[s.statusTitle, { color: C.red }]}>Cliente escolheu outro prestador</Text>
         <Text style={s.statusSub}>Continue swipando para encontrar novos serviços.</Text>
       </View>
     );
@@ -82,6 +84,15 @@ export function PrestAceiteDetailScreen() {
           <Text style={s.title}>{servico.titulo}</Text>
           <Text style={s.desc}>{servico.descricao}</Text>
 
+          {meuValor != null && (
+            <View style={s.valorCard}>
+              <Text style={s.valorLabel}>Seu valor proposto</Text>
+              <Text style={s.valorText}>
+                R$ {Number(meuValor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </Text>
+            </View>
+          )}
+
           {statusBlock}
         </View>
         <View style={{ height: 40 }} />
@@ -103,6 +114,12 @@ const s = StyleSheet.create({
   tagText: { fontSize: 11, color: C.textDim },
   title: { fontSize: 24, fontWeight: '800', color: C.textMain, marginBottom: 10, lineHeight: 30 },
   desc: { fontSize: 14, color: C.textDim, lineHeight: 22, marginBottom: 16 },
+  valorCard: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: 14, padding: 16, marginBottom: 16, alignItems: 'center',
+  },
+  valorLabel: { fontSize: 11, fontWeight: '700', color: C.textMute, textTransform: 'uppercase', letterSpacing: 0.8 },
+  valorText: { fontSize: 28, fontWeight: '900', color: C.accent, marginTop: 4 },
   statusBox: {
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
     borderRadius: 16, padding: 24, alignItems: 'center', marginTop: 8,

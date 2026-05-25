@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 
 // Altere este endereço para o IP do seu servidor em produção.
 // Android Emulator → 10.0.2.2 | iOS Simulator → localhost
@@ -53,16 +52,16 @@ export const api = {
 
   // Solicitante
   publicarServico: (data: unknown) => request('POST', '/servicos', data),
+  editarServico: (id: string, data: unknown) => request('PATCH', `/servicos/${id}`, data),
   meusServicos: () => request('GET', '/servicos/meus'),
   getServico: (id: string) => request('GET', `/servicos/${id}`),
-  aprovarPrestador: (id: string) => request('POST', `/servicos/${id}/aprovar`),
-  recusarPrestador: (id: string) => request('POST', `/servicos/${id}/recusar`),
+  aprovarPrestador: (id: string, prestadorId: string) => request('POST', `/servicos/${id}/aprovar`, { prestadorId }),
   concluirServico: (id: string) => request('POST', `/servicos/${id}/concluir`),
   cancelarServico: (id: string) => request('POST', `/servicos/${id}/cancelar`),
 
   // Prestador
   feed: () => request('GET', '/feed'),
-  aceitarServico: (id: string) => request('POST', `/feed/${id}/aceitar`),
+  aceitarServico: (id: string, valorProposto: number) => request('POST', `/feed/${id}/aceitar`, { valorProposto }),
   recusarServicoSwipe: (id: string) => request('POST', `/feed/${id}/recusar`),
   meusAceites: () => request('GET', '/aceites/meus'),
 

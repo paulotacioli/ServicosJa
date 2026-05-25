@@ -51,6 +51,10 @@ export class SignupDto {
   @IsOptional()
   @IsArray()
   bairros?: string[];
+
+  @IsOptional()
+  @IsString()
+  foto?: string;
 }
 
 export class LoginDto {

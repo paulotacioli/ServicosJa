@@ -31,9 +31,9 @@ export function SolHomeScreen() {
   }, []);
 
   const grupos: Record<string, any[]> = {
-    'Aguardando aprovação': servicos.filter(s => s.estado === 'AGUARDANDO_APROVACAO'),
+    'Prestadores interessados': servicos.filter(s => s.estado === 'ABERTO' && (s.aceitesCount ?? 0) > 0),
     'Aprovados': servicos.filter(s => s.estado === 'APROVADO'),
-    'Abertos': servicos.filter(s => s.estado === 'ABERTO'),
+    'Aguardando prestadores': servicos.filter(s => s.estado === 'ABERTO' && (s.aceitesCount ?? 0) === 0),
     'Histórico': servicos.filter(s => ['CONCLUIDO', 'CANCELADO'].includes(s.estado)),
   };
 
@@ -65,19 +65,26 @@ export function SolHomeScreen() {
           return (
             <View key={titulo}>
               <SectionTitle>{titulo}</SectionTitle>
-              {items.map(s => (
+              {items.map(sv => (
                 <TouchableOpacity
-                  key={s.id}
-                  onPress={() => router.push(`/servico/${s.id}`)}
+                  key={sv.id}
+                  onPress={() => router.push(`/servico/${sv.id}`)}
                   style={st.card}
                   activeOpacity={0.7}
                 >
-                  <Image source={{ uri: s.fotos[0] }} style={st.cardImg} />
+                  {sv.fotos?.[0] ? (
+                    <Image source={{ uri: sv.fotos[0] }} style={st.cardImg} />
+                  ) : (
+                    <View style={[st.cardImg, { backgroundColor: C.surface2 }]} />
+                  )}
                   <View style={st.cardInfo}>
-                    <Text style={st.cardTitle} numberOfLines={1}>{s.titulo}</Text>
+                    <Text style={st.cardTitle} numberOfLines={1}>{sv.titulo}</Text>
                     <View style={st.cardMeta}>
-                      <Badge estado={s.estado} />
-                      <Text style={st.cardCat}> · {s.categoria.split(' ')[0]}</Text>
+                      <Badge estado={sv.estado} />
+                      <Text style={st.cardCat}> · {sv.categoria.split(' ')[0]}</Text>
+                      {(sv.aceitesCount ?? 0) > 0 && (
+                        <Text style={st.cardAceites}> · {sv.aceitesCount} interessado{sv.aceitesCount > 1 ? 's' : ''}</Text>
+                      )}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -125,6 +132,7 @@ const st = StyleSheet.create({
   cardImg: { width: 60, height: 60, borderRadius: 12, backgroundColor: C.surface2 },
   cardInfo: { flex: 1 },
   cardTitle: { fontSize: 14, fontWeight: '700', color: C.textMain, marginBottom: 6 },
-  cardMeta: { flexDirection: 'row', alignItems: 'center' },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   cardCat: { fontSize: 11, color: C.textMute },
+  cardAceites: { fontSize: 11, color: C.accent, fontWeight: '700' },
 });

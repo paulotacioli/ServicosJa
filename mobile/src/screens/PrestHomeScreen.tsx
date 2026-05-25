@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, Animated, PanResponder, StyleSheet, TouchableOpacity, Image, Dimensions,
+  View, Text, Animated, PanResponder, StyleSheet, TouchableOpacity,
+  Image, Dimensions, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Header, IconButton } from '../components/UI';
+import { Header, IconButton, Button } from '../components/UI';
 import { Icons } from '../components/Icons';
 import { C } from '../lib/colors';
 import { timeAgo } from '../lib/helpers';
@@ -29,6 +30,10 @@ export function PrestHomeScreen() {
   const toast = useToast();
   const [feed, setFeed] = useState<any[]>([]);
   const [idx, setIdx] = useState(0);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [pendingServico, setPendingServico] = useState<any>(null);
+  const [valor, setValor] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const loadFeed = async () => {
     try {
@@ -49,14 +54,36 @@ export function PrestHomeScreen() {
       toast('Aguarde a verificação da sua conta para aceitar serviços.', 'error');
       return;
     }
-    setIdx(prev => prev + 1);
     if (dir === 'yes') {
-      api.aceitarServico(s.id)
-        .then(() => toast('✓ Aceito! O cliente foi avisado.', 'success'))
-        .catch((e: any) => toast(e.message, 'error'));
+      setPendingServico(s);
+      setValor('');
+      setModalVisible(true);
     } else {
+      setIdx(prev => prev + 1);
       api.recusarServicoSwipe(s.id).catch(() => {});
     }
+  };
+
+  const confirmarAceite = async () => {
+    const valorNum = parseFloat(valor.replace(',', '.'));
+    if (!valor || isNaN(valorNum) || valorNum <= 0) {
+      toast('Informe um valor válido para realizar este serviço', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.aceitarServico(pendingServico.id, valorNum);
+      toast('✓ Aceito! O cliente foi avisado.', 'success');
+      setModalVisible(false);
+      setIdx(prev => prev + 1);
+    } catch (e: any) {
+      toast(e.message, 'error');
+    } finally { setSubmitting(false); }
+  };
+
+  const cancelarAceite = () => {
+    setModalVisible(false);
+    setPendingServico(null);
   };
 
   const empty = idx >= feed.length;
@@ -112,6 +139,51 @@ export function PrestHomeScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Modal: informar valor ao aceitar */}
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={cancelarAceite}>
+        <View style={m.overlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
+            <View style={m.sheet}>
+              <Text style={m.title}>Informe seu valor</Text>
+              {pendingServico && (
+                <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+                  <View style={m.servicoInfo}>
+                    <Text style={m.servicoCat}>{pendingServico.categoria}</Text>
+                    <Text style={m.servicoTitulo}>{pendingServico.titulo}</Text>
+                    <Text style={m.servicoDesc} numberOfLines={4}>{pendingServico.descricao}</Text>
+                    <View style={m.servicoMeta}>
+                      <Icons.Loc color={C.textMute} />
+                      <Text style={m.servicoMetaTxt}> {pendingServico.bairro}, {pendingServico.cidade}</Text>
+                    </View>
+                  </View>
+                </ScrollView>
+              )}
+              <Text style={m.valorLabel}>Qual valor você cobra por este serviço? (R$)</Text>
+              <TextInput
+                style={m.valorInput}
+                value={valor}
+                onChangeText={setValor}
+                placeholder="Ex: 150,00"
+                placeholderTextColor={C.textMute}
+                keyboardType="decimal-pad"
+                autoFocus
+              />
+              <View style={m.btnRow}>
+                <View style={{ flex: 1 }}>
+                  <Button variant="ghost" onPress={cancelarAceite}>Cancelar</Button>
+                </View>
+                <View style={{ width: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Button onPress={confirmarAceite} disabled={submitting}>
+                    {submitting ? '...' : 'Aceitar'}
+                  </Button>
+                </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -160,7 +232,6 @@ function SwipeCard({ servico, onSwipe }: { servico: any; onSwipe: (dir: 'yes' | 
       style={[sc.card, { transform: [{ translateX: position.x }, { translateY: position.y }, { rotate }] }]}
       {...panResponder.panHandlers}
     >
-      {/* Stamps */}
       <Animated.View style={[sc.stamp, sc.stampYes, { opacity: acceptOpacity }]}>
         <Text style={[sc.stampText, { color: C.green, borderColor: C.green }]}>ACEITAR</Text>
       </Animated.View>
@@ -168,7 +239,6 @@ function SwipeCard({ servico, onSwipe }: { servico: any; onSwipe: (dir: 'yes' | 
         <Text style={[sc.stampText, { color: C.red, borderColor: C.red }]}>RECUSAR</Text>
       </Animated.View>
 
-      {/* Labels */}
       <View style={sc.labelCat}>
         <Text style={sc.labelText}>{servico.categoria}</Text>
       </View>
@@ -243,4 +313,36 @@ const sc = StyleSheet.create({
   cardDesc: { fontSize: 13, color: C.textDim, lineHeight: 20, flex: 1 },
   cardFooter: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10, marginTop: 8 },
   cardFooterText: { fontSize: 11, color: C.textMute },
+});
+
+const m = StyleSheet.create({
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end', alignItems: 'center',
+  },
+  sheet: {
+    backgroundColor: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, width: '100%',
+  },
+  title: { fontSize: 20, fontWeight: '800', color: C.textMain, marginBottom: 16 },
+  servicoInfo: {
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: 14, padding: 14, marginBottom: 16,
+  },
+  servicoCat: {
+    fontSize: 10, fontWeight: '700', color: C.accent, textTransform: 'uppercase',
+    letterSpacing: 0.8, marginBottom: 4,
+  },
+  servicoTitulo: { fontSize: 15, fontWeight: '700', color: C.textMain, marginBottom: 6 },
+  servicoDesc: { fontSize: 13, color: C.textDim, lineHeight: 18, marginBottom: 8 },
+  servicoMeta: { flexDirection: 'row', alignItems: 'center' },
+  servicoMetaTxt: { fontSize: 11, color: C.textMute },
+  valorLabel: { fontSize: 13, fontWeight: '600', color: C.textDim, marginBottom: 8 },
+  valorInput: {
+    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.accent,
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16,
+    fontSize: 22, fontWeight: '800', color: C.textMain,
+    marginBottom: 20,
+  },
+  btnRow: { flexDirection: 'row' },
 });

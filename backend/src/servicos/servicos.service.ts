@@ -6,11 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateServicoDto } from './servicos.dto';
+import { AceitarServicoDto, AprovarPrestadorDto, CreateServicoDto, EditarServicoDto } from './servicos.dto';
 
 const ESTADO = {
   ABERTO: 'ABERTO',
-  AGUARDANDO: 'AGUARDANDO_APROVACAO',
   APROVADO: 'APROVADO',
   CONCLUIDO: 'CONCLUIDO',
   CANCELADO: 'CANCELADO',
@@ -68,13 +67,59 @@ export class ServicosService {
     return this._serializeServico(s);
   }
 
+  // ---------------- solicitante: editar serviço ----------------
+  async editar(servicoId: string, solicitanteId: string, dto: EditarServicoDto) {
+    const s = await this.prisma.servico.findUnique({ where: { id: servicoId } });
+    if (!s) throw new NotFoundException('Serviço não encontrado');
+    if (s.solicitanteId !== solicitanteId) throw new ForbiddenException('Sem permissão');
+    if (s.estado !== ESTADO.ABERTO) {
+      throw new BadRequestException('Não é possível editar serviço nesse estado');
+    }
+
+    const aceites = await this.prisma.acaoServico.count({
+      where: { servicoId, acao: 'ACEITOU' },
+    });
+    if (aceites > 0) {
+      throw new BadRequestException('Não é possível editar após um prestador ter aceitado');
+    }
+
+    const updated = await this.prisma.servico.update({
+      where: { id: servicoId },
+      data: {
+        ...(dto.titulo !== undefined && { titulo: dto.titulo }),
+        ...(dto.descricao !== undefined && { descricao: dto.descricao }),
+        ...(dto.categoria !== undefined && { categoria: dto.categoria }),
+        ...(dto.fotos !== undefined && { fotos: dto.fotos.join('|||') }),
+        ...(dto.cidade !== undefined && { cidade: dto.cidade }),
+        ...(dto.bairro !== undefined && { bairro: dto.bairro }),
+      },
+    });
+    return this._serializeServico(updated);
+  }
+
   // ---------------- solicitante: listar próprios ----------------
   async getMeus(solicitanteId: string) {
     const rows = await this.prisma.servico.findMany({
       where: { solicitanteId },
       orderBy: { criadoEm: 'desc' },
     });
-    return rows.map((r) => this._serializeServico(r));
+
+    // Para cada serviço ABERTO, verificar se tem aceites pendentes
+    const ids = rows.filter(r => r.estado === ESTADO.ABERTO).map(r => r.id);
+    let aceitesMap: Record<string, number> = {};
+    if (ids.length > 0) {
+      const acoes = await this.prisma.acaoServico.groupBy({
+        by: ['servicoId'],
+        where: { servicoId: { in: ids }, acao: 'ACEITOU' },
+        _count: { id: true },
+      });
+      acoes.forEach(a => { aceitesMap[a.servicoId] = a._count.id; });
+    }
+
+    return rows.map(r => ({
+      ...this._serializeServico(r),
+      aceitesCount: aceitesMap[r.id] || 0,
+    }));
   }
 
   // ---------------- detalhe ----------------
@@ -85,83 +130,94 @@ export class ServicosService {
     });
     if (!s) throw new NotFoundException('Serviço não encontrado');
 
-    const canView = s.solicitanteId === viewerId || s.prestadorAceitoId === viewerId;
+    // Verificar se o viewer é o solicitante ou um prestador que aceitou
+    const acaoViewer = await this.prisma.acaoServico.findFirst({
+      where: { servicoId: id, prestadorId: viewerId, acao: 'ACEITOU' },
+    });
+    const canView = s.solicitanteId === viewerId || !!acaoViewer;
     if (!canView) throw new ForbiddenException('Sem permissão');
 
     const wppRevelado = s.estado === ESTADO.APROVADO || s.estado === ESTADO.CONCLUIDO;
+
+    // Para o solicitante: buscar lista de aceites com dados do prestador
+    let aceitesList: any[] = [];
+    if (s.solicitanteId === viewerId && s.estado === ESTADO.ABERTO) {
+      const acoes = await this.prisma.acaoServico.findMany({
+        where: { servicoId: id, acao: 'ACEITOU' },
+        include: { prestador: true },
+        orderBy: { criadoEm: 'asc' },
+      });
+      aceitesList = acoes.map(a => ({
+        prestador: this._serializeUser(a.prestador, false),
+        valorProposto: a.valorProposto,
+        acaoId: a.id,
+        criadoEm: a.criadoEm,
+      }));
+    }
+
     return {
       ...this._serializeServico(s),
       prestadorAceito: s.prestadorAceito ? this._serializeUser(s.prestadorAceito, wppRevelado) : null,
+      aceites: aceitesList,
+      meuValorProposto: acaoViewer?.valorProposto ?? null,
     };
   }
 
   // ---------------- solicitante: aprovar prestador ----------------
-  async aprovar(servicoId: string, solicitanteId: string) {
+  async aprovar(servicoId: string, solicitanteId: string, dto: AprovarPrestadorDto) {
     const s = await this.prisma.servico.findUnique({ where: { id: servicoId } });
     if (!s) throw new NotFoundException('Serviço não encontrado');
     if (s.solicitanteId !== solicitanteId) throw new ForbiddenException('Sem permissão');
-    if (s.estado !== ESTADO.AGUARDANDO) {
-      throw new BadRequestException('Serviço não está aguardando aprovação');
+    if (s.estado !== ESTADO.ABERTO) {
+      throw new BadRequestException('Serviço não está aberto para aprovação');
     }
 
-    const [updated] = await this.prisma.$transaction([
+    // Verificar que o prestador realmente aceitou
+    const aceite = await this.prisma.acaoServico.findFirst({
+      where: { servicoId, prestadorId: dto.prestadorId, acao: 'ACEITOU' },
+    });
+    if (!aceite) {
+      throw new BadRequestException('Esse prestador não aceitou este serviço');
+    }
+
+    // Buscar todos os outros prestadores que aceitaram para notificar
+    const outrosAceites = await this.prisma.acaoServico.findMany({
+      where: { servicoId, acao: 'ACEITOU', prestadorId: { not: dto.prestadorId } },
+      select: { prestadorId: true },
+    });
+
+    await this.prisma.$transaction([
       this.prisma.servico.update({
         where: { id: servicoId },
-        data: { estado: ESTADO.APROVADO },
+        data: { estado: ESTADO.APROVADO, prestadorAceitoId: dto.prestadorId },
       }),
       this.prisma.acaoServico.create({
-        data: {
-          servicoId,
-          prestadorId: s.prestadorAceitoId!,
-          acao: 'APROVADO_PELO_CLIENTE',
-        },
+        data: { servicoId, prestadorId: dto.prestadorId, acao: 'APROVADO_PELO_CLIENTE' },
       }),
+      ...outrosAceites.map(o =>
+        this.prisma.acaoServico.create({
+          data: { servicoId, prestadorId: o.prestadorId, acao: 'RECUSADO_PELO_CLIENTE' },
+        })
+      ),
     ]);
 
-    await this._notify(s.prestadorAceitoId!, {
+    await this._notify(dto.prestadorId, {
       tipo: 'APROVADO',
       titulo: '🎉 Você foi aprovado!',
       mensagem: 'O cliente aprovou. Aguarde o contato pelo WhatsApp.',
       servicoId,
     });
 
-    return this.getOne(servicoId, solicitanteId);
-  }
-
-  // ---------------- solicitante: recusar prestador (volta à fila) ----------------
-  async recusar(servicoId: string, solicitanteId: string, motivo?: string) {
-    const s = await this.prisma.servico.findUnique({ where: { id: servicoId } });
-    if (!s) throw new NotFoundException('Serviço não encontrado');
-    if (s.solicitanteId !== solicitanteId) throw new ForbiddenException('Sem permissão');
-    if (s.estado !== ESTADO.AGUARDANDO) {
-      throw new BadRequestException('Serviço não está aguardando aprovação');
+    for (const outro of outrosAceites) {
+      await this._notify(outro.prestadorId, {
+        tipo: 'RECUSADO',
+        titulo: 'Cliente escolheu outro',
+        mensagem: 'Continue swipando — há outros serviços!',
+        servicoId,
+      });
     }
 
-    const prestadorRejeitadoId = s.prestadorAceitoId!;
-
-    await this.prisma.$transaction([
-      this.prisma.acaoServico.create({
-        data: {
-          servicoId,
-          prestadorId: prestadorRejeitadoId,
-          acao: 'RECUSADO_PELO_CLIENTE',
-          motivo,
-        },
-      }),
-      this.prisma.servico.update({
-        where: { id: servicoId },
-        data: { estado: ESTADO.ABERTO, prestadorAceitoId: null },
-      }),
-    ]);
-
-    await this._notify(prestadorRejeitadoId, {
-      tipo: 'RECUSADO',
-      titulo: 'Cliente escolheu outro',
-      mensagem: 'Continue swipando — há outros serviços!',
-      servicoId,
-    });
-
-    return { ok: true };
+    return this.getOne(servicoId, solicitanteId);
   }
 
   async concluir(servicoId: string, solicitanteId: string) {
@@ -190,7 +246,7 @@ export class ServicosService {
     const s = await this.prisma.servico.findUnique({ where: { id: servicoId } });
     if (!s) throw new NotFoundException('Serviço não encontrado');
     if (s.solicitanteId !== solicitanteId) throw new ForbiddenException('Sem permissão');
-    if (![ESTADO.ABERTO, ESTADO.AGUARDANDO].includes(s.estado)) {
+    if (![ESTADO.ABERTO].includes(s.estado)) {
       throw new BadRequestException('Não é possível cancelar nesse estado');
     }
     await this.prisma.servico.update({
@@ -206,7 +262,6 @@ export class ServicosService {
     if (!prestador) throw new NotFoundException('Prestador não encontrado');
 
     const categorias = prestador.categorias ? prestador.categorias.split(',') : [];
-    const bairros = prestador.bairros ? prestador.bairros.split(',') : [];
 
     // Serviços já vistos por esse prestador
     const acoes = await this.prisma.acaoServico.findMany({
@@ -226,9 +281,8 @@ export class ServicosService {
     return servicos.map((s) => this._serializeServico(s));
   }
 
-  // ---------------- prestador: aceitar (concorrência) ----------------
-  async aceitar(servicoId: string, prestadorId: string) {
-    // Transação com checagem de estado (equivalente a SELECT FOR UPDATE)
+  // ---------------- prestador: aceitar (múltiplos aceites permitidos) ----------------
+  async aceitar(servicoId: string, prestadorId: string, dto: AceitarServicoDto) {
     return this.prisma.$transaction(async (tx) => {
       const prestador = await tx.usuario.findUnique({ where: { id: prestadorId } });
       if (prestador?.statusVerificacao !== 'APROVADO') {
@@ -238,19 +292,17 @@ export class ServicosService {
       const s = await tx.servico.findUnique({ where: { id: servicoId } });
       if (!s) throw new NotFoundException('Serviço não encontrado');
       if (s.estado !== ESTADO.ABERTO) {
-        throw new ConflictException('Esse serviço já foi aceito por outro profissional');
+        throw new ConflictException('Esse serviço não está mais disponível');
       }
 
-      await tx.servico.update({
-        where: { id: servicoId },
-        data: {
-          estado: ESTADO.AGUARDANDO,
-          prestadorAceitoId: prestadorId,
-        },
+      // Verificar se já aceitou
+      const jaAceitou = await tx.acaoServico.findFirst({
+        where: { servicoId, prestadorId, acao: 'ACEITOU' },
       });
+      if (jaAceitou) throw new ConflictException('Você já aceitou este serviço');
 
       await tx.acaoServico.create({
-        data: { servicoId, prestadorId, acao: 'ACEITOU' },
+        data: { servicoId, prestadorId, acao: 'ACEITOU', valorProposto: dto.valorProposto },
       });
 
       await tx.notificacao.create({
@@ -258,7 +310,7 @@ export class ServicosService {
           usuarioId: s.solicitanteId,
           tipo: 'PRESTADOR_ACEITOU',
           titulo: '✨ Um prestador aceitou seu serviço',
-          mensagem: 'Veja o perfil dele e decida se libera o contato.',
+          mensagem: 'Veja o perfil e o valor proposto. Decida quem vai fazer.',
           servicoId,
         },
       });
@@ -269,7 +321,6 @@ export class ServicosService {
 
   // ---------------- prestador: recusar (swipe negativo) ----------------
   async recusarSwipe(servicoId: string, prestadorId: string) {
-    // Evita duplicação
     const ja = await this.prisma.acaoServico.findFirst({
       where: { servicoId, prestadorId, acao: { in: ['ACEITOU', 'RECUSOU'] } },
     });
@@ -286,7 +337,7 @@ export class ServicosService {
     const acoes = await this.prisma.acaoServico.findMany({
       where: { prestadorId, acao: 'ACEITOU' },
       orderBy: { criadoEm: 'desc' },
-      select: { servicoId: true },
+      select: { servicoId: true, valorProposto: true, criadoEm: true },
     });
     const ids = acoes.map((a) => a.servicoId);
 
@@ -294,6 +345,24 @@ export class ServicosService {
       where: { id: { in: ids } },
       orderBy: { criadoEm: 'desc' },
     });
-    return servicos.map((s) => this._serializeServico(s));
+
+    const servicoMap = Object.fromEntries(servicos.map(s => [s.id, s]));
+
+    return acoes.map(acao => {
+      const s = servicoMap[acao.servicoId];
+      if (!s) return null;
+      const serialized = this._serializeServico(s);
+      let resultado: string;
+      if (s.estado === ESTADO.ABERTO) {
+        resultado = 'AGUARDANDO';
+      } else if (s.estado === ESTADO.APROVADO && s.prestadorAceitoId === prestadorId) {
+        resultado = 'APROVADO';
+      } else if (s.estado === ESTADO.CONCLUIDO && s.prestadorAceitoId === prestadorId) {
+        resultado = 'CONCLUIDO';
+      } else {
+        resultado = 'NAO_SELECIONADO';
+      }
+      return { ...serialized, valorProposto: acao.valorProposto, resultado };
+    }).filter(Boolean);
   }
 }
