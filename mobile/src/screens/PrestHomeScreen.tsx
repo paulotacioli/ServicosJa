@@ -120,7 +120,13 @@ export function PrestHomeScreen() {
         ) : (
           <>
             {next && <BackCard servico={next} />}
-            <SwipeCard key={current.id} servico={current} onSwipe={handleSwipe} />
+            <SwipeCard
+              key={current.id}
+              servico={current}
+              onSwipe={handleSwipe}
+              aprovado={aprovado}
+              onBlockedSwipe={() => toast('Aguarde a verificação da sua conta para aceitar serviços.', 'error')}
+            />
           </>
         )}
       </View>
@@ -196,8 +202,20 @@ function BackCard({ servico }: { servico: any }) {
   );
 }
 
-function SwipeCard({ servico, onSwipe }: { servico: any; onSwipe: (dir: 'yes' | 'no') => void }) {
+function SwipeCard({ servico, onSwipe, aprovado, onBlockedSwipe }: {
+  servico: any;
+  onSwipe: (dir: 'yes' | 'no') => void;
+  aprovado: boolean;
+  onBlockedSwipe: () => void;
+}) {
   const position = useRef(new Animated.ValueXY()).current;
+  // Refs para capturar os valores mais recentes dentro do PanResponder
+  const aprovadoRef = useRef(aprovado);
+  aprovadoRef.current = aprovado;
+  const onSwipeRef = useRef(onSwipe);
+  onSwipeRef.current = onSwipe;
+  const onBlockedRef = useRef(onBlockedSwipe);
+  onBlockedRef.current = onBlockedSwipe;
 
   const rotate = position.x.interpolate({
     inputRange: [-SCREEN_W / 2, 0, SCREEN_W / 2],
@@ -208,14 +226,26 @@ function SwipeCard({ servico, onSwipe }: { servico: any; onSwipe: (dir: 'yes' | 
   const acceptOpacity = position.x.interpolate({ inputRange: [0, 80], outputRange: [0, 1], extrapolate: 'clamp' });
   const rejectOpacity = position.x.interpolate({ inputRange: [-80, 0], outputRange: [1, 0], extrapolate: 'clamp' });
 
+  const springBack = () =>
+    Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (_, g) => position.setValue({ x: g.dx, y: g.dy }),
       onPanResponderRelease: (_, g) => {
-        if (g.dx > SWIPE_THRESHOLD) flyOut('yes');
-        else if (g.dx < -SWIPE_THRESHOLD) flyOut('no');
-        else Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        if (g.dx > SWIPE_THRESHOLD) {
+          if (!aprovadoRef.current) {
+            springBack();
+            onBlockedRef.current();
+          } else {
+            flyOut('yes');
+          }
+        } else if (g.dx < -SWIPE_THRESHOLD) {
+          flyOut('no');
+        } else {
+          springBack();
+        }
       },
     })
   ).current;
@@ -224,7 +254,7 @@ function SwipeCard({ servico, onSwipe }: { servico: any; onSwipe: (dir: 'yes' | 
     const toX = dir === 'yes' ? SCREEN_W * 1.5 : -SCREEN_W * 1.5;
     Animated.timing(position, {
       toValue: { x: toX, y: 0 }, duration: 250, useNativeDriver: false,
-    }).start(() => onSwipe(dir));
+    }).start(() => onSwipeRef.current(dir));
   };
 
   return (

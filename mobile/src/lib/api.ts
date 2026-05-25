@@ -30,9 +30,13 @@ async function request(method: string, path: string, body?: unknown): Promise<an
   if (!res.ok) {
     let msg = 'Erro na requisição';
     try {
-      const j = await res.json();
-      msg = j.message || msg;
-      if (Array.isArray(msg)) msg = msg.join(', ');
+      if (res.status === 413) {
+        msg = 'Imagem muito grande. Tente uma foto menor.';
+      } else {
+        const j = await res.json();
+        msg = j.message || msg;
+        if (Array.isArray(msg)) msg = msg.join(', ');
+      }
     } catch {}
     throw new Error(msg);
   }

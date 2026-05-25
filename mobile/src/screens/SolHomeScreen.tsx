@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, Image,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Header, IconButton, SectionTitle, Badge, EmptyCard, Loader } from '../components/UI';
@@ -15,20 +15,26 @@ export function SolHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [hasUnread, setHasUnread] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const data = await api.meusServicos();
-        if (alive) { setServicos(data); setLoading(false); }
-        const unread = await api.notifUnread();
-        if (alive) setHasUnread((unread?.count ?? 0) > 0);
-      } catch { if (alive) setLoading(false); }
-    };
-    load();
-    const id = setInterval(load, 4000);
-    return () => { alive = false; clearInterval(id); };
+  const load = useCallback(async () => {
+    try {
+      const data = await api.meusServicos();
+      setServicos(data);
+      const unread = await api.notifUnread();
+      setHasUnread((unread?.count ?? 0) > 0);
+    } catch {}
+    setLoading(false);
   }, []);
+
+  // Recarrega imediatamente ao focar na tela (ex: após aceitar serviço)
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    load();
+  }, [load]));
+
+  useEffect(() => {
+    const id = setInterval(load, 4000);
+    return () => clearInterval(id);
+  }, [load]);
 
   const grupos: Record<string, any[]> = {
     'Prestadores interessados': servicos.filter(s => s.estado === 'ABERTO' && (s.aceitesCount ?? 0) > 0),

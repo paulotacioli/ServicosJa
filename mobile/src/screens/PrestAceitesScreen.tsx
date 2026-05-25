@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { api } from '../lib/api';
 import { Header, SectionTitle, EmptyCard, Loader } from '../components/UI';
 import { C } from '../lib/colors';
@@ -16,18 +16,24 @@ export function PrestAceitesScreen() {
   const [aceites, setAceites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const data = await api.meusAceites();
-        if (alive) { setAceites(data); setLoading(false); }
-      } catch { if (alive) setLoading(false); }
-    };
-    load();
-    const id = setInterval(load, 4000);
-    return () => { alive = false; clearInterval(id); };
+  const load = useCallback(async () => {
+    try {
+      const data = await api.meusAceites();
+      setAceites(data);
+    } catch {}
+    setLoading(false);
   }, []);
+
+  // Recarrega ao focar na tela
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    load();
+  }, [load]));
+
+  useEffect(() => {
+    const id = setInterval(load, 4000);
+    return () => clearInterval(id);
+  }, [load]);
 
   const grupos: Record<string, any[]> = {
     'Aguardando cliente decidir': aceites.filter(s => s.resultado === 'AGUARDANDO'),

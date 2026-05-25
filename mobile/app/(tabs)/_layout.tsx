@@ -1,13 +1,20 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, router } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { Icons } from '../../src/components/Icons';
 import { C } from '../../src/lib/colors';
 
 export default function TabsLayout() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const isSol = user?.role === 'solicitante';
   const accent = isSol ? C.accent : C.blue;
+
+  // Redireciona para login quando o usuário faz logout
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/');
+    }
+  }, [user, loading]);
 
   return (
     <Tabs

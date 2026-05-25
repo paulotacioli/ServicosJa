@@ -79,7 +79,7 @@ export function WelcomeScreen() {
               mediaTypes: ['images'],
               allowsEditing: true,
               aspect: [1, 1],
-              quality: 0.5,
+              quality: 0.3,
               base64: true,
             });
             if (!result.canceled && result.assets[0]) {
@@ -97,7 +97,7 @@ export function WelcomeScreen() {
               mediaTypes: ['images'],
               allowsEditing: true,
               aspect: [1, 1],
-              quality: 0.5,
+              quality: 0.3,
               base64: true,
             });
             if (!result.canceled && result.assets[0]) {
